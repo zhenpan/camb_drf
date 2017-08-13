@@ -19,8 +19,8 @@ Transfer_kh = 1
 Transfer_cdm = 2
 Transfer_b = 3
 Transfer_g = 4
-Transfer_r = 5
-Transfer_nu = 6
+Transfer_drf = 5
+Transfer_r = 6          #ZP drf and massless nu
 Transfer_tot = 7
 Transfer_nonu = 8
 Transfer_tot_de = 9
@@ -38,7 +38,7 @@ NonLinear_both = 3
 derived_names = ['age', 'zstar', 'rstar', 'thetastar', 'DAstar', 'zdrag',
                  'rdrag', 'kd', 'thetad', 'zeq', 'keq', 'thetaeq', 'thetarseq']
 
-transfer_names = ['k/h', 'delta_cdm', 'delta_baryon', 'delta_photon', 'delta_neutrino', 'delta_nu', 'delta_tot',
+transfer_names = ['k/h', 'delta_cdm', 'delta_baryon', 'delta_photon', 'delta_drf', 'delta_neutrino', 'delta_tot',
                   'delta_nonu', 'delta_tot_de', 'Weyl', 'v_newtonian_cdm', 'v_newtonian_baryon', 'v_baryon_cdm']
 
 evolve_names = transfer_names + ['a', 'etak', 'H', 'growth', 'v_photon', 'pi_photon', 'E_2', 'v_neutrino']
@@ -84,6 +84,7 @@ call_again = dll_import(c_int, "modelparams", "call_again")
 
 grhom = dll_import(c_double, "modelparams", "grhom")
 grhog = dll_import(c_double, "modelparams", "grhog")
+grhog_drf = dll_import(c_double, "modelparams", "grhog_drf")
 grhor = dll_import(c_double, "modelparams", "grhor")
 grhob = dll_import(c_double, "modelparams", "grhob")
 grhoc = dll_import(c_double, "modelparams", "grhoc")
@@ -218,6 +219,7 @@ class CAMBparams(CAMB_Structure):
         ("TCMB", c_double),
         ("YHe", c_double),
         ("num_nu_massless", c_double),
+        ("Num_drf", c_double),
         ("num_nu_massive", c_int),
         ("nu_mass_eigenstates", c_int),
         ("share_delta_neff", c_int),  # logical
@@ -296,11 +298,11 @@ class CAMBparams(CAMB_Structure):
         CAMB_setinitialpower(byref(self), byref(initial_power_params))
         return self
 
-    def set_cosmology(self, H0=67.0, cosmomc_theta=None, ombh2=0.022, omch2=0.12, omk=0.0,
+    def set_cosmology(self, H0=67.0, cosmomc_theta=None, ombh2=0.022, omch2=0.12, omk=0.0, Num_drf=0.2,                   
                       neutrino_hierarchy='degenerate', num_massive_neutrinos=1,
                       mnu=0.06, nnu=3.046, YHe=None, meffsterile=0.0, standard_neutrino_neff=3.046,
                       TCMB=constants.COBE_CMBTemp, tau=None, deltazrei=None, bbn_predictor=None,
-                      theta_H0_range=[10, 100]):
+                      theta_H0_range=[10, 100]):                                                       #ZP drf
         """
         Sets cosmological parameters in terms of physical densities and parameters used in Planck 2015 analysis.
         Default settings give a single distinct neutrino mass eigenstate, by default one neutrino with mnu = 0.06eV.
@@ -368,6 +370,8 @@ class CAMBparams(CAMB_Structure):
         fac = (self.H0 / 100.0) ** 2
         self.omegab = ombh2 / fac
         self.omegac = omch2 / fac
+
+        self.Num_drf = Num_drf       #ZP drf
 
         neutrino_mass_fac = 94.07
         # conversion factor for thermal with Neff=3 TCMB=2.7255
