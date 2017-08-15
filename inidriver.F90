@@ -108,12 +108,14 @@
         P%omegab = Ini_Read_Double('ombh2')/(P%H0/100)**2
         P%omegac = Ini_Read_Double('omch2')/(P%H0/100)**2
         P%omegan = Ini_Read_Double('omnuh2')/(P%H0/100)**2
-        P%omegav = 1- Ini_Read_Double('omk') - P%omegab-P%omegac - P%omegan
+        P%omegac_idm = Ini_Read_Double('omidmh2')/(P%H0/100)**2                             !ZP idm--interacting dark matter
+        P%omegav = 1- Ini_Read_Double('omk') - P%omegab-P%omegac - P%omegan-P%omegac_idm    !ZP
     else
         P%omegab = Ini_Read_Double('omega_baryon')
         P%omegac = Ini_Read_Double('omega_cdm')
         P%omegav = Ini_Read_Double('omega_lambda')
         P%omegan = Ini_Read_Double('omega_neutrino')
+        P%omegac_idm = Ini_Read_Double('omega_idm')          !ZP idm
     end if
 
     P%tcmb   = Ini_Read_Double('temp_cmb',COBE_CMBTemp)

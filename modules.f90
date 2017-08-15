@@ -111,6 +111,7 @@
         real(dl)  :: omegab, omegac, omegav, omegan
         !Omega baryon, CDM, Lambda and massive neutrino
         real(dl)  :: H0,TCMB,yhe,Num_Nu_massless
+        real(dl)  :: omegac_idm     !ZP Omega of idm  (interacting dark matter)
 	real(dl)  :: Num_drf        !ZP num of drf (dark radiation fluid)
         integer   :: Num_Nu_massive !sum of Nu_mass_numbers below
         integer   :: Nu_mass_eigenstates  !1 for degenerate masses
@@ -174,6 +175,7 @@
     !     adotrad - a(tau) in radiation era
 
     real(dl) grhom,grhog,grhor,grhob,grhoc,grhov,grhornomass,grhok
+    real(dl) grhoc_idm                               !ZP idm 
     real(dl) grhog_drf                               !ZP grhor*number of drf 
     real(dl) taurst,dtaurec,taurend, tau_maxvis,adotrad
 
@@ -376,6 +378,7 @@
     grhob=grhom*CP%omegab
     grhov=grhom*CP%omegav
     grhok=grhom*CP%omegak
+    grhoc_idm=grhom*CP%omegac_idm       !ZP idm
     !  adotrad gives the relation a(tau) in the radiation era:
     adotrad = sqrt((grhog+grhog_drf+grhornomass+sum(grhormass(1:CP%Nu_mass_eigenstates)))/3) !drf
 
@@ -422,6 +425,7 @@
     else if (FeedbackLevel > 0 .and. .not. call_again) then
         write(*,'("Om_b h^2             = ",f9.6)') CP%omegab*(CP%H0/100)**2
         write(*,'("Om_c h^2             = ",f9.6)') CP%omegac*(CP%H0/100)**2
+        write(*,'("Om_idm h^2           = ",f9.6)') CP%omegac_idm*(CP%H0/100)**2
         write(*,'("Om_nu h^2            = ",f9.6)') CP%omegan*(CP%H0/100)**2
         write(*,'("Om_Lambda            = ",f9.6)') CP%omegav
         write(*,'("Om_K                 = ",f9.6)') CP%omegak
@@ -702,7 +706,7 @@
     external rombint
 
     ombh2 = CP%omegab*(CP%h0/100.0d0)**2
-    omdmh2 = (CP%omegac+CP%omegan)*(CP%h0/100.0d0)**2
+    omdmh2 = (CP%omegac+CP%omegan+CP%omegac_idm)*(CP%h0/100.0d0)**2   !ZP idm
 
     !!From Hu & Sugiyama
     zstar =  1048*(1+0.00124*ombh2**(-0.738))*(1+ &
@@ -1738,18 +1742,19 @@
     use Errors
     implicit none
     public
-    integer, parameter :: Transfer_kh =1, Transfer_cdm=2,Transfer_b=3,Transfer_g=4, &
-        Transfer_drf=5, Transfer_r = 6,  & !ZP drf and massless neutrino
-    Transfer_tot=7, Transfer_nonu=8, Transfer_tot_de=9,  &
+    integer, parameter :: Transfer_kh =1, Transfer_cdm=2, Transfer_idm=3, Transfer_b=4,Transfer_g=5, &
+        Transfer_drf=6, Transfer_r = 7,  Transfer_nu=8, & !ZP drf and massless neutrino
+    Transfer_tot=9, Transfer_nonu=10, Transfer_tot_de=11,  &
         ! total perturbations with and without neutrinos, with neutrinos+dark energy in the numerator
-        Transfer_Weyl = 10, & ! the Weyl potential, for lensing and ISW
-    Transfer_Newt_vel_cdm=11, Transfer_Newt_vel_baryon=12,   & ! -k v_Newtonian/H
-    Transfer_vel_baryon_cdm = 13 !relative velocity of baryons and CDM
+        Transfer_Weyl = 12, & ! the Weyl potential, for lensing and ISW
+    Transfer_Newt_vel_cdm=13, Transfer_Newt_vel_baryon=14,   & ! -k v_Newtonian/H
+    Transfer_vel_baryon_cdm = 15, & !relative velocity of baryons and CDM
+    Transfer_vel_idm = 16                                             !ZP idm velocity
 
-    integer, parameter :: Transfer_max = Transfer_vel_baryon_cdm
+    integer, parameter :: Transfer_max = Transfer_vel_idm
     character(LEN=name_tag_len) :: Transfer_name_tags(Transfer_max-1) = &
-        ['CDM     ', 'baryon  ', 'photon  ', 'drf     ', 'nu      ', 'total   ', &
-        'no_nu   ', 'total_de', 'Weyl    ', 'v_CDM   ', 'v_b     ', 'v_b-v_c ']
+        ['CDM     ', 'idm     ', 'baryon  ', 'photon  ', 'drf     ', 'nu      ', 'mass_nu ', 'total   ', &
+        'no_nu   ', 'total_de', 'Weyl    ', 'v_CDM   ', 'v_b     ', 'v_b-v_c ', 'v_idm']
 
     logical :: transfer_interp_matterpower  = .true. !output regular grid in log k
     !set to false to output calculated values for later interpolation
@@ -2676,8 +2681,8 @@
     integer noutput
     external rombint
 
-    call Recombination_Init(CP%Recomb, CP%omegac, CP%omegab,CP%Omegan, CP%Omegav, &
-        CP%h0,CP%tcmb,CP%yhe,CP%Num_Nu_massless + CP%Num_Nu_massive)
+    call Recombination_Init(CP%Recomb, CP%omegac+CP%omegac_idm, CP%omegab,CP%Omegan, CP%Omegav, &
+        CP%h0,CP%tcmb,CP%yhe,CP%Num_Nu_massless + CP%Num_Nu_massive)       !ZP idm
     !almost all the time spent here
     if (global_error_flag/=0) return
     Maxtau=taumax
@@ -2695,7 +2700,7 @@
     last_dotmu = 0
 
     matter_verydom_tau = 0
-    a_verydom = AccuracyBoost*5*(grhog+grhornomass)/(grhoc+grhob)
+    a_verydom = AccuracyBoost*5*(grhog+grhornomass)/(grhoc+grhob+grhoc_idm)  !ZP idm
 
     !  Initial conditions: assume radiation-dominated universe.
     tau01=tauminn
@@ -2924,7 +2929,7 @@
         ThermoDerivedParams( derived_rdrag ) = rs
         ThermoDerivedParams( derived_kD ) =  sqrt(1.d0/(rombint(ddamping_da, 1d-8, 1/(z_star+1), 1d-6)/6))
         ThermoDerivedParams( derived_thetaD ) =  100*pi/ThermoDerivedParams( derived_kD )/DA
-        z_eq = (grhob+grhoc)/(grhog+grhog_drf+grhornomass+sum(grhormass(1:CP%Nu_mass_eigenstates))) -1   !ZP drf
+        z_eq = (grhob+grhoc+grhoc_idm)/(grhog+grhog_drf+grhornomass+sum(grhormass(1:CP%Nu_mass_eigenstates))) -1   !ZP drf and idm
         ThermoDerivedParams( derived_zEQ ) = z_eq
         a_eq = 1/(1+z_eq)
         ThermoDerivedParams( derived_kEQ ) = 1/(a_eq*dtauda(a_eq))

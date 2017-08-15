@@ -200,7 +200,7 @@
     use precision
     use ModelParams
     real(dl)  GetOmegak
-    GetOmegak = 1 - (CP%omegab+CP%omegac+CP%omegav+CP%omegan)
+    GetOmegak = 1 - (CP%omegab+CP%omegac+CP%omegac_idm+CP%omegav+CP%omegan)      !ZP idm contribution
 
     end function GetOmegak
 
@@ -230,8 +230,8 @@
     a2=a**2
 
     !  8*pi*G*rho*a**4.
-    !ZP drf contribution  grhox are values of today
-    grhoa2=grhok*a2+(grhoc+grhob)*a+grhog+grhornomass+grhog_drf 
+    !ZP idm and drf contribution  grhox are values of today
+    grhoa2=grhok*a2+(grhoc+grhob+grhoc_idm)*a+grhog+grhornomass+grhog_drf 
     if (is_cosmological_constant) then
         grhoa2=grhoa2+grhov*a2**2
     else
@@ -267,8 +267,8 @@
     !Description of this file. Change if you make modifications.
     character(LEN=*), parameter :: Eqns_name = 'equations_ppf-Aug10'
 
-    !ZP was 5, now include density and velocity of drf
-    integer, parameter :: basic_num_eqns = 7
+    !ZP was 5, now 5+4: include density and velocity of idm and drf
+    integer, parameter :: basic_num_eqns = 9
 
     logical :: DoTensorNeutrinos = .true.
 
@@ -1345,6 +1345,9 @@
     real(dl) qgdot,pigdot,pirdot,vbdot,dgrho
     real(dl) a,a2,dz,z,clxc,clxb,vb,clxg,qg,pig,clxr,qr,pir
 
+    !ZP idm vars
+    real(dl) grhoc_idm_t, vc_idm, vc_idm_dot, clxc_idm
+
     !ZP drf vars 
     real(dl) grhog_drf_t
     real(dl) qg_drf_dot
@@ -1387,9 +1390,14 @@
     vb  =y(5)
     vbdot =yprime(5)
 
+    !ZP idm vars
+    clxc_idm=y(6)
+    vc_idm  =y(7)
+    vc_idm_dot=yprime(7)
+
     !ZP drf vars
-    clxg_drf=y(6)
-    qg_drf=y(7)
+    clxg_drf=y(8)
+    qg_drf=y(9)
 
     !  Compute expansion rate from: grho 8*pi*rho*a**2
 
@@ -1398,14 +1406,15 @@
     grhor_t=grhornomass/a2
     grhog_t=grhog/a2
 
-    ! ZP drf contribution
+    ! ZP idm and drf contribution
+    grhoc_idm_t=grhoc_idm/a
     grhog_drf_t = grhog_drf/a2 
 
     !  8*pi*a*a*SUM[rho_i*clx_i] add radiation later
-    dgrho=grhob_t*clxb+grhoc_t*clxc
+    dgrho=grhob_t*clxb+grhoc_t*clxc+grhoc_idm_t*clxc_idm      !ZP idm contribution
 
     !  8*pi*a*a*SUM[(rho_i+p_i)*v_i]
-    dgq=grhob_t*vb
+    dgq=grhob_t*vb + grhoc_idm_t*vc_idm                !ZP idm 
 
     if (is_cosmological_constant) then
         w_eff = -1_dl
@@ -1417,7 +1426,7 @@
         dgrho=dgrho+EV%dgrho_e_ppf
         dgq=dgq+EV%dgq_e_ppf
     end if
-    grho=grhob_t+grhoc_t+grhor_t+grhog_t+grhog_drf_t+grhov_t  !ZP drf contribution added
+    grho=grhob_t+grhoc_t+grhoc_idm_t+grhor_t+grhog_t+grhog_drf_t+grhov_t  !ZP idm and drf contribution added
     gpres=(grhog_t+grhog_drf_t+grhor_t)/3+grhov_t*w_eff       !ZP
 
 
@@ -1792,7 +1801,7 @@
     rhomass =  sum(grhormass(1:CP%Nu_mass_eigenstates))
     grhonu=rhomass+grhornomass
 
-    om = (grhob+grhoc)/sqrt(3*(grhog+grhonu+grhog_drf))  !ZP drf
+    om = (grhob+grhoc+grhoc_idm)/sqrt(3*(grhog+grhonu+grhog_drf))  !ZP idm and drf
     omtau=om*tau
     Rv=grhonu/(grhonu+grhog+grhog_drf)                   !ZP free-streaming fraction
 
@@ -1895,9 +1904,13 @@
     y(4)=InitVec(i_clxb)
     y(5)=InitVec(i_vb)
   
-    !ZP drf 
-    y(6)=InitVec(i_clxg)
-    y(7)=InitVec(i_qg)
+    !ZP idm same to cdm
+    y(6)=InitVec(i_clxc)
+    y(7)=0.
+
+    !ZP drf same to photon
+    y(8)=InitVec(i_clxg)
+    y(9)=InitVec(i_qg)
 
     !  Photons
     y(EV%g_ix)=InitVec(i_clxg)
@@ -2126,6 +2139,11 @@
     real(dl) q,aq,v
     real(dl) G11_t,G30_t, wnu_arr(max_nu)
 
+    !ZP idm variables 
+    real(dl) clxc_idm, clxc_idm_dot
+    real(dl) grhoc_idm_t
+    real(dl) vc_idm, vc_idm_dot
+
     !ZP drf variables
     real(dl) grhog_drf_t 
     real(dl) clxg_drf_dot, qg_drf_dot
@@ -2148,7 +2166,7 @@
     k2=EV%k2_buf
 
 
-    !ZP basic eqns 5+2 (a, k*eta, clxc, clxb, vb)+(clxg_drf, qg_drf)
+    !ZP basic eqns 5+4 (a, k*eta, clxc, clxb, vb)+(clxc_idm, vc_idm, clxg_drf, qg_drf)
     a=ay(1)
     a2=a*a
 
@@ -2161,9 +2179,13 @@
     clxb=ay(4)
     vb=ay(5)
 
+    !ZP  idm variables 
+    clxc_idm=ay(6)
+    vc_idm=ay(7) 
+
     !ZP  drf variables 
-    clxg_drf=ay(6)
-    qg_drf=ay(7) 
+    clxg_drf=ay(8)
+    qg_drf=ay(9) 
 
     !  Compute expansion rate from: grho 8*pi*rho*a**2
 
@@ -2173,7 +2195,8 @@
     grhoc_t=grhoc/a
     grhor_t=grhornomass/a2
     grhog_t=grhog/a2
-    !ZP drf 
+    !ZP idm and drf 
+    grhoc_idm_t=grhoc_idm/a
     grhog_drf_t= grhog_drf/a2
     if (is_cosmological_constant) then
         grhov_t=grhov*a2
@@ -2191,15 +2214,15 @@
         call thermo(tau,cs2,opacity)
     end if
 
-    !ZP drf
+    !ZP idm and drf
     gpres=(grhor_t+grhog_t+grhog_drf_t)/3._dl
-    grho_matter=grhob_t+grhoc_t
+    grho_matter=grhob_t+grhoc_t+grhoc_idm_t
 
     !total perturbations: matter terms first, then add massive nu, de and radiation
     !  8*pi*a*a*SUM[rho_i*clx_i]
-    dgrho_matter=grhob_t*clxb+grhoc_t*clxc
+    dgrho_matter=grhob_t*clxb+grhoc_t*clxc+grhoc_idm_t*clxc_idm         !ZP idm
     !  8*pi*a*a*SUM[(rho_i+p_i)*v_i]
-    dgq=grhob_t*vb
+    dgq=grhob_t*vb + grhoc_idm_t*vc_idm                                 !ZP idm
 
     if (CP%Num_Nu_Massive > 0) then
         call MassiveNuVars(EV,ay,a,grho_matter,gpres,dgrho_matter,dgq, wnu_arr)
@@ -2328,6 +2351,7 @@
     if (associated(EV%OutputTransfer)) then
         EV%OutputTransfer(Transfer_kh) = k/(CP%h0/100._dl)
         EV%OutputTransfer(Transfer_cdm) = clxc
+        EV%OutputTransfer(Transfer_idm) = clxc_idm   !ZP idm transfer
         EV%OutputTransfer(Transfer_b) = clxb
         EV%OutputTransfer(Transfer_g) = clxg
         EV%OutputTransfer(Transfer_drf) = clxg_drf   !ZP drf transfer
@@ -2337,15 +2361,16 @@
         if (CP%Num_Nu_Massive /= 0) then
             call MassiveNuVarsOut(EV,ay,ayprime,a, clxnu_all =clxnu_all, dgpi= dgpi)
         end if
-        !EV%OutputTransfer(Transfer_nu) = clxnu_all  !ZP comment out massive nu    
+        EV%OutputTransfer(Transfer_nu) = clxnu_all      
         EV%OutputTransfer(Transfer_tot) =  dgrho_matter/grho_matter !includes neutrinos
-        EV%OutputTransfer(Transfer_nonu) = (grhob_t*clxb+grhoc_t*clxc)/(grhob_t + grhoc_t)
+        EV%OutputTransfer(Transfer_nonu) = (grhob_t*clxb+grhoc_t*clxc+grhoc_idm*clxc_idm)/(grhob_t + grhoc_t+grhoc_idm_t)
         EV%OutputTransfer(Transfer_tot_de) =  dgrho/grho_matter
         !Transfer_Weyl is k^2Phi, where Phi is the Weyl potential
         EV%OutputTransfer(Transfer_Weyl) = -(dgrho +3*dgq*adotoa/k)/(EV%Kf(1)*2) - dgpi/2
         EV%OutputTransfer(Transfer_Newt_vel_cdm)=  -k*sigma/adotoa
         EV%OutputTransfer(Transfer_Newt_vel_baryon) = -k*(vb + sigma)/adotoa
         EV%OutputTransfer(Transfer_vel_baryon_cdm) = vb
+        EV%OutputTransfer(Transfer_vel_idm) = vc_idm  !ZP idm vel 
     end if
 
     !  CDM equation of motion
@@ -2413,12 +2438,19 @@
 
     ayprime(5)=vbdot
 
+    !ZP  idm equation of motion.
+    clxc_idm_dot=-k*(z+vc_idm)
+    vc_idm_dot=0.
+
+    ayprime(6)=clxc_idm_dot
+    ayprime(7)=vc_idm_dot
+
     ! ZP drf equation of motion 
     clxg_drf_dot=-k*(4._dl/3._dl*z+qg_drf)
     qg_drf_dot = k/3._dl*clxg_drf  
 
-    ayprime(6) = clxg_drf_dot 
-    ayprime(7) = qg_drf_dot 
+    ayprime(8) = clxg_drf_dot 
+    ayprime(9) = qg_drf_dot 
 
 
     if (.not. EV%no_phot_multpoles) then
