@@ -434,7 +434,7 @@
         write(*,'("Num_drf              = ",f9.6)') CP%Num_drf                   !drf
         if (CP%Num_Nu_Massive > 0) then
             write(*,'("N_eff (total)        = ",f9.6)') nu_massless_degeneracy + &
-                sum(CP%Nu_mass_degeneracies(1:CP%Nu_mass_eigenstates))
+                sum(CP%Nu_mass_degeneracies(1:CP%Nu_mass_eigenstates)) + CP%Num_drf
             do nu_i=1, CP%Nu_mass_eigenstates
                 conv = k_B*(8*grhor/grhog/7)**0.25*CP%tcmb/eV * &
                     (CP%nu_mass_degeneracies(nu_i)/CP%nu_mass_numbers(nu_i))**0.25 !approx 1.68e-4

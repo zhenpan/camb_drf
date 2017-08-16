@@ -88,6 +88,7 @@ grhog_drf = dll_import(c_double, "modelparams", "grhog_drf")
 grhor = dll_import(c_double, "modelparams", "grhor")
 grhob = dll_import(c_double, "modelparams", "grhob")
 grhoc = dll_import(c_double, "modelparams", "grhoc")
+grhoc_idm = dll_import(c_double, "modelparams", "grhoc_idm")
 grhov = dll_import(c_double, "modelparams", "grhov")
 grhornomass = dll_import(c_double, "modelparams", "grhornomass")
 grhok = dll_import(c_double, "modelparams", "grhok")
@@ -213,6 +214,7 @@ class CAMBparams(CAMB_Structure):
         ("max_eta_k_tensor", c_double),
         ("omegab", c_double),
         ("omegac", c_double),
+        ("omegac_idm", c_double),
         ("omegav", c_double),
         ("omegan", c_double),
         ("H0", c_double),
@@ -298,7 +300,7 @@ class CAMBparams(CAMB_Structure):
         CAMB_setinitialpower(byref(self), byref(initial_power_params))
         return self
 
-    def set_cosmology(self, H0=67.0, cosmomc_theta=None, ombh2=0.022, omch2=0.12, omk=0.0, Num_drf=0.2,                   
+    def set_cosmology(self, H0=67.0, cosmomc_theta=None, ombh2=0.022, omch2=0.12, omidmh2=0.0, omk=0.0, Num_drf=0.2,                   
                       neutrino_hierarchy='degenerate', num_massive_neutrinos=1,
                       mnu=0.06, nnu=3.046, YHe=None, meffsterile=0.0, standard_neutrino_neff=3.046,
                       TCMB=constants.COBE_CMBTemp, tau=None, deltazrei=None, bbn_predictor=None,
@@ -370,6 +372,7 @@ class CAMBparams(CAMB_Structure):
         fac = (self.H0 / 100.0) ** 2
         self.omegab = ombh2 / fac
         self.omegac = omch2 / fac
+        self.omegac_idm = omidmh2 / fac
 
         self.Num_drf = Num_drf       #ZP drf
 
@@ -390,7 +393,7 @@ class CAMBparams(CAMB_Structure):
 
         omnuh2 = omnuh2 + omnuh2_sterile
         self.omegan = omnuh2 / fac
-        self.omegav = 1 - omk - self.omegab - self.omegac - self.omegan
+        self.omegav = 1 - omk - self.omegab - self.omegac - self.omegac_idm - self.omegan
         # self.share_delta_neff = False
         # self.nu_mass_eigenstates = 0
         # self.num_nu_massless = nnu
@@ -459,7 +462,7 @@ class CAMBparams(CAMB_Structure):
 
         :return: Omega_k
         """
-        return 1 - self.omegab - self.omegac - self.omegan - self.omegav
+        return 1 - self.omegab - self.omegac - self.omegac_idm - self.omegan - self.omegav
 
     def set_matter_power(self, redshifts=[0.], kmax=1.2, k_per_logint=None, silent=False):
         """

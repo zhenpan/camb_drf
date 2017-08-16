@@ -22,6 +22,8 @@ camb.egg-info/SOURCES.txt
 camb.egg-info/dependency_links.txt
 camb.egg-info/top_level.txt
 camb/drf/model.py
+camb/idm/model.py
+camb/standard/model.py
 camb_tests/__init__.py
 camb_tests/camb_test.py
 dlls/cambdll.dll
