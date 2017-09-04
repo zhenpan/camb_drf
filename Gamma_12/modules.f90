@@ -2637,7 +2637,7 @@
          j=j-1
       end do 
      
-      Thermo_OpacityToTime_dark = exp(j*dlntau)*tauminn
+      Thermo_OpacityToTime_dark = exp((j-1)*dlntau)*tauminn
  
     end function Thermo_OpacityToTime_dark
         
@@ -2668,7 +2668,7 @@
     a0=adotrad*tauminn
     a02=a0*a0
 
-    dotmu(0)= (a0*3._dl/4*grhoc_idm/grhog_drf)*a0*(CP%Gamma0/a0**CP%beta)
+    dotmu(1)= (a0*3._dl/4*grhoc_idm/grhog_drf)*a0*(CP%Gamma0/a0**CP%beta)
 
     do i=2,nthermo_dark
        tau=tauminn*exp((i-1)*dlntau)
@@ -2681,7 +2681,7 @@
        a=a0+2._dl*dtau/(1._dl/adot0+1._dl/adot)
        
        dotmu(i)= (a*3._dl/4*grhoc_idm/grhog_drf)*a*(CP%Gamma0/a**CP%beta)  
-
+       
        ! For Gamma_t ~ T^\beta with \beta = 1, tau_drf is larger than tau at early time 
        ! tau_drf = 0.005 tau_Hub is the onset of tight coupling
 
