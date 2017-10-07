@@ -114,6 +114,7 @@
         real(dl)  :: omegac_idm     !ZP Omega of idm  (interacting dark matter)
 	real(dl)  :: Num_drf        !ZP num of drf (dark radiation fluid)
 	real(dl)  :: Gamma0         !ZP idm-drf coupling constant
+        integer   :: beta           !ZP idm-drf coupling scaling 
         logical   :: has_idmdrf_cpl !ZP    
         integer   :: Num_Nu_massive !sum of Nu_mass_numbers below
         integer   :: Nu_mass_eigenstates  !1 for degenerate masses
@@ -434,7 +435,7 @@
         write(*,'("Om_m (1-Om_K-Om_L)   = ",f9.6)') 1-CP%omegak-CP%omegav
         write(*,'("100 theta (CosmoMC)  = ",f9.6)') 100*CosmomcTheta()
         write(*,'("Num_drf              = ",f9.6)') CP%Num_drf                  !drf
-        write(*,'("Gamma0(10^-7 Mpc^-2) = ",f9.6)') CP%Gamma0*1.e7              !drf
+        write(*,'("Gamma0(10^-7 Mpc^-2) = ",f9.4)') CP%Gamma0*1.e7              !drf
         if (CP%Num_Nu_Massive > 0) then
             write(*,'("N_eff (total)        = ",f9.6)') nu_massless_degeneracy + &
                 sum(CP%Nu_mass_degeneracies(1:CP%Nu_mass_eigenstates)) + CP%Num_drf
@@ -2568,7 +2569,174 @@
 
     end module Transfer
 
+    !ccccccccccccccccccccccccccccccccccccccccccccccccccc
 
+    module ThermoData_dark
+    use ModelData
+    implicit None
+    private
+    integer,parameter :: nthermo_dark=20000
+
+    real(dl) dotmu(nthermo_dark), ddotmu(nthermo_dark)
+    real(dl) dddotmu(nthermo_dark), ddddotmu(nthermo_dark)
+    real(dl) dotmu_idm(nthermo_dark), ddotmu_idm(nthermo_dark)
+    real(dl) dddotmu_idm(nthermo_dark), ddddotmu_idm(nthermo_dark)
+    real(dl) tauminn, dlntau
+    real(dl) :: tight_tau_drf, tight_tau_idm
+
+    public thermo_dark, Thermo_OpacityToTime_drf, Thermo_OpacityToTime_idm, inithermo_dark, tight_tau_drf, tight_tau_idm
+    contains 
+
+    subroutine thermo_dark(tau, opacity, opacity_idm, dopacity, dopacity_idm)
+    !compute opacity and its time derivative 
+    implicit none
+    real(dl) tau, opacity, opacity_idm
+    real(dl), intent(out), optional :: dopacity, dopacity_idm 
+
+    integer i 
+    real(dl) d
+  
+    d=log(tau/tauminn)/dlntau+1._dl
+    i=int(d)
+    d=d-i
+    if (i < 1) then
+        !Linear interpolation if out of bounds (should not occur).
+        opacity=dotmu(1)+(d-1)*ddotmu(1)
+        opacity_idm=dotmu_idm(1)+(d-1)*ddotmu_idm(1)
+        stop 'thermo out of bounds'
+    else if (i > nthermo_dark) then
+        opacity=dotmu(nthermo_dark)+(d-nthermo_dark)*ddotmu(nthermo_dark)
+        opacity_idm=dotmu_idm(nthermo_dark)+(d-nthermo_dark)*ddotmu_idm(nthermo_dark)
+        if (present(dopacity)) then
+            dopacity = 0
+            stop 'thermo_dark: shouldn''t happen'
+        end if
+    else if (i == nthermo_dark) then      !ZP avoid the above stop for tau=tau0 (i=nthermo_dark) case
+        opacity=dotmu(nthermo_dark)
+        opacity_idm=dotmu_idm(nthermo_dark)
+        if (present(dopacity)) then 
+            dopacity = ddotmu(nthermo_dark)
+            dopacity_idm = ddotmu_idm(nthermo_dark)
+        end if
+    else
+        !Cubic spline interpolation.
+        opacity=dotmu(i)+d*(ddotmu(i)+d*(3*(dotmu(i+1)-dotmu(i)) &
+        -2*ddotmu(i)-ddotmu(i+1)+d*(ddotmu(i)+ddotmu(i+1) &
+        +2*(dotmu(i)-dotmu(i+1)))))
+
+        opacity_idm=dotmu_idm(i)+d*(ddotmu_idm(i)+d*(3*(dotmu_idm(i+1)-dotmu_idm(i)) &
+        -2*ddotmu_idm(i)-ddotmu_idm(i+1)+d*(ddotmu_idm(i)+ddotmu_idm(i+1) &
+        +2*(dotmu_idm(i)-dotmu_idm(i+1)))))
+
+        if (present(dopacity)) then
+            dopacity=(ddotmu(i)+d*(dddotmu(i)+d*(3*(ddotmu(i+1)  &
+            -ddotmu(i))-2*dddotmu(i)-dddotmu(i+1)+d*(dddotmu(i) &
+            +dddotmu(i+1)+2*(ddotmu(i)-ddotmu(i+1))))))/(tau*dlntau)
+        end if
+        if (present(dopacity_idm)) then
+            dopacity=(ddotmu_idm(i)+d*(dddotmu_idm(i)+d*(3*(ddotmu_idm(i+1)  &
+            -ddotmu_idm(i))-2*dddotmu_idm(i)-dddotmu_idm(i+1)+d*(dddotmu_idm(i) &
+            +dddotmu_idm(i+1)+2*(ddotmu_idm(i)-ddotmu_idm(i+1))))))/(tau*dlntau)
+        end if
+    end if
+    end subroutine thermo_dark
+
+    function  Thermo_OpacityToTime_drf(opacity)
+      real(dl), intent(in) :: opacity
+      integer j
+      real(dl) Thermo_OpacityToTime_drf
+
+      !ZP: scat_drf ~ a**(2-beta)  [~ 1/a  for beta=3]
+      j = 1
+      do while(dotmu(j) > opacity)
+         j=j+1
+      end do 
+     
+      Thermo_OpacityToTime_drf = exp((j-1)*dlntau)*tauminn
+    end function Thermo_OpacityToTime_drf
+        
+
+    function  Thermo_OpacityToTime_idm(opacity)
+      real(dl), intent(in) :: opacity
+      integer j
+      real(dl) Thermo_OpacityToTime_idm
+
+      !ZP: scat_idm ~ a**(1-beta)  [~ 1/a**2  for beta=3]
+      j = 1
+      do while(dotmu_idm(j) > opacity)
+         j=j+1
+      end do 
+     
+      Thermo_OpacityToTime_idm = exp((j-1)*dlntau)*tauminn
+    end function Thermo_OpacityToTime_idm
+
+    subroutine inithermo_dark(taumin, taumax)
+    use constants
+    use ModelParams 
+
+    real(dl) taumin, taumax
+
+    real(dl) tau01, adot0, a0, a02, dtau
+    real(dl) tau, adot, a, a2
+    integer  i
+    real(dl) spline_data_dark(nthermo_dark)
+    real(dl) dtauda
+
+    external dtauda
+
+    tight_tau_drf= 0.0_dl
+    tight_tau_idm= 0.0_dl
+    
+    tauminn=0.05d0*taumin
+    dlntau=log(CP%tau0/tauminn)/(nthermo_dark-1)
+    
+    !Inital conditions: assume radiation-dominated universe 
+    tau01=tauminn
+    adot0=adotrad
+    a0=adotrad*tauminn
+    a02=a0*a0
+
+    dotmu(1)= (a0*3._dl/4*grhoc_idm/grhog_drf)*a0*(CP%Gamma0/a0**CP%beta)
+
+    do i=2,nthermo_dark
+       tau=tauminn*exp((i-1)*dlntau)
+       dtau=tau-tau01
+
+       ! Integrate Friedmann equation using inverse traspezoidal rule.
+       a=a0+adot0*dtau
+       a2=a*a
+       adot=1/dtauda(a)
+       a=a0+2._dl*dtau/(1._dl/adot0+1._dl/adot)
+       
+       dotmu(i)= (a*3._dl/4*grhoc_idm/grhog_drf)*a*(CP%Gamma0/a**CP%beta)  
+       dotmu_idm(i)= a*(CP%Gamma0/a**CP%beta)  
+
+       ! For Gamma_t ~ T^\beta with \beta = 3, tau_drf is larger than tau at early time 
+       ! tau_drf = 0.005 tau_Hub is the onset of tight coupling
+
+       !Determine tight-coupling switch for drf
+       if (tight_tau_drf==0 .and. 1._dl/(tau*dotmu(i)) > 0.005) tight_tau_drf = tau
+
+       !Determine tight-coupling switch for idm
+       if (tight_tau_idm==0 .and. 1._dl/(tau*dotmu_idm(i)) > 0.005) tight_tau_idm = tau
+
+       ! update varibles for next step
+       a0=a
+       tau01=tau
+       adot0=adot
+     end do !i
+
+     write(*, '("tight_tau_drf/Mpc    =", f8.1)') tight_tau_drf
+     write(*, '("tight_tau_idm/Mpc    =", f8.1)') tight_tau_idm
+
+     call splini(spline_data_dark, nthermo_dark)
+     call splder(dotmu,ddotmu,nthermo_dark,spline_data_dark)
+     call splder(ddotmu,dddotmu,nthermo_dark,spline_data_dark)
+     call splder(dddotmu,ddddotmu,nthermo_dark,spline_data_dark)
+
+     end subroutine inithermo_dark 
+
+     end module ThermoData_dark
     !ccccccccccccccccccccccccccccccccccccccccccccccccccc
 
     module ThermoData
@@ -2665,6 +2833,7 @@
     use precision
     use ModelParams
     use MassiveNu
+    use ThermoData_dark
     real(dl) taumin,taumax
 
 
@@ -2683,6 +2852,8 @@
     real(dl) rombint
     integer noutput
     external rombint
+
+    call inithermo_dark(taumin, taumax)
 
     call Recombination_Init(CP%Recomb, CP%omegac+CP%omegac_idm, CP%omegab,CP%Omegan, CP%Omegav, &
         CP%h0,CP%tcmb,CP%yhe,CP%Num_Nu_massless + CP%Num_Nu_massive)       !ZP idm

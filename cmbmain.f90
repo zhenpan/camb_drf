@@ -629,6 +629,8 @@
 
     function GetTauStart(q)
     real(dl), intent(IN) :: q
+    !ZP temp vars for tight_idm and decouple_idm
+    real(dl) a1, a2            
     real(dl) taustart, GetTauStart
 
     !     Begin when wave is far outside horizon.
@@ -652,6 +654,17 @@
         taustart=min(taustart,1.d-3/maxval(nu_masses(1:CP%Nu_mass_eigenstates))/adotrad)
     end if
 
+    !ZP   if at tau_start, idm is tight-coupled/ well decoupled, then accept it;
+    ! elseif we want a smaller tau_start when idm is tight-couplged
+    ! Combine a = adotrad*tau with  1/(a*Gamma_t * tau) = 0.005 or 1, we get tight_tau_idm, decouple_tau_idm
+    
+    a1 = (0.005*CP%Gamma0/adotrad)**(1._dl/(CP%beta-2))  !For CP%beta == 3
+    a2 = (CP%Gamma0/adotrad)**(1._dl/(CP%beta-2))  
+
+    if(taustart > a1/adotrad .and. taustart < a2/adotrad) then
+       taustart = a1/adotrad
+    end if 
+   
     GetTauStart=taustart
     end function GetTauStart
 
@@ -774,7 +787,7 @@
     call GaugeInterface_Init
 
     if (Feedbacklevel > 0)  &
-        write(*,'("tau_recomb/Mpc       = ",f7.2,"  tau_now/Mpc = ",f8.1)') tau_maxvis,CP%tau0
+        write(*,'("tau_recomb/Mpc       = ",f7.2,"  tau_now/Mpc = ",f9.2)') tau_maxvis,CP%tau0
 
     !     Calculating the times for the outputs of the transfer functions.
     !

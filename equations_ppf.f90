@@ -358,6 +358,11 @@
         integer E_ix, B_ix !tensor polarization indices
         real(dl) denlkt(4,max_l_evolve),Kft(max_l_evolve)
         real, pointer :: OutputTransfer(:) => null()
+
+        !ZP idm-drf variables 
+        real(dl) TightSwitchoffTime_dark
+        logical  TightCoupling_dark
+       
     end type EvolutionVars
 
     !precalculated arrays
@@ -451,7 +456,8 @@
             tau_switch_no_phot_multpoles =max(15/EV%k_buf,taurend)*AccuracyBoost
     end if
 
-    next_switch = min(tau_switch_ktau, tau_switch_nu_massless,EV%TightSwitchoffTime, tau_switch_nu_massive, &
+    !ZP: idm-drf tight switch
+    next_switch = min(tau_switch_ktau, tau_switch_nu_massless,EV%TightSwitchoffTime_dark,EV%TightSwitchoffTime, tau_switch_nu_massive, &
         tau_switch_no_nu_multpoles, tau_switch_no_phot_multpoles, tau_switch_nu_nonrel,noSwitch)
 
     if (next_switch < tauend) then
@@ -461,8 +467,19 @@
         end if
 
         EVout=EV
+       
+        !ZP idm-drf
+        if (next_switch == EV%TightSwitchoffTime_dark) then 
 
-        if (next_switch == EV%TightSwitchoffTime) then
+            EVout%TightCoupling_dark=.false.
+            EVout%TightSwitchoffTime_dark = noSwitch
+            call SetupScalarArrayIndices(EVout)
+            call CopyScalarVariableArray(y,yout, EV, EVout)
+            EV=EVout
+            y=yout
+            ind=1
+    
+        else if (next_switch == EV%TightSwitchoffTime) then
             !TightCoupling
             EVout%TightCoupling=.false.
             EVout%TightSwitchoffTime = noSwitch
@@ -920,6 +937,7 @@
     EV%high_ktau_neutrino_approx = .false.
     if (CP%WantScalars) then
         EV%TightCoupling=.true.
+        EV%TightCoupling_dark=.true.  
         EV%no_phot_multpoles =.false.
         EV%no_nu_multpoles =.false.
         EV%MassiveNuApprox=.false.
@@ -1735,6 +1753,7 @@
     subroutine initial(EV,y, tau)
     !  Initial conditions.
     use ThermoData
+    use ThermoData_dark   !ZP  
     implicit none
 
     type(EvolutionVars) EV
@@ -1748,6 +1767,8 @@
         i_qg=5,i_qr=6,i_vb=7,i_pir=8, i_eta=9, i_aj3r=10,i_clxq=11,i_vq=12
     integer, parameter :: i_max = i_vq
     real(dl) initv(6,1:i_max), initvec(1:i_max)
+ 
+    real(dl) tau_drf, tau_idm  !ZP idm-drf temp variables for tightswitchofftime of drf and idm
 
     nullify(EV%OutputTransfer) !Should not be needed, but avoids issues in ifort 14
 
@@ -1788,6 +1809,13 @@
     else
         ep=ep0
     end if
+
+    !ZP idm-drf  opacity_drf ~ 1/a, opacity_idm ~1/a**2, for beta=3, tight coupling turns off at late time
+    tau_drf = min(tight_tau_drf, Thermo_OpacityToTime_drf(EV%k_buf/0.005))
+    tau_idm = min(tight_tau_idm, Thermo_OpacityToTime_idm(EV%k_buf/0.005))
+
+    EV%TightSwitchoffTime_dark = max(tight_tau_drf, tight_tau_idm)
+
     if (second_order_tightcoupling) ep=ep*2
     EV%TightSwitchoffTime = min(tight_tau,Thermo_OpacityToTime(EV%k_buf/ep))
 
@@ -1904,9 +1932,10 @@
     y(4)=InitVec(i_clxb)
     y(5)=InitVec(i_vb)
   
-    !ZP idm same to cdm
+    !ZP idm density same to cdm
+    !   
     y(6)=InitVec(i_clxc)
-    y(7)=0.
+    y(7)=(1._dl-exp(-tau/tight_tau_idm))*InitVec(i_vb)
 
     !ZP drf same to photon
     y(8)=InitVec(i_clxg)
@@ -2122,6 +2151,7 @@
     !  Evaluate the time derivatives of the perturbations
     !  ayprime is not necessarily GaugeInterface.yprime, so keep them distinct
     use ThermoData
+    use ThermoData_dark !ZP idm-drf
     use MassiveNu
     implicit none
     type(EvolutionVars) EV
@@ -2150,7 +2180,9 @@
     real(dl) clxg_drf,     qg_drf
 
     !ZP dm-drf variables
-    real(dl) Gamma_t, R_idm   
+    real(dl) Gamma_t, R_idm, pb43_dark   
+    real(dl) opacity_dark, dopacity_dark
+    real(dl) slip_dark
 
     real(dl) dgq,grhob_t,grhor_t,grhoc_t,grhog_t,grhov_t,sigma,polter
     real(dl) qgdot,qrdot,pigdot,pirdot,vbdot,dgrho,adotoa
@@ -2216,6 +2248,7 @@
     else
         call thermo(tau,cs2,opacity)
     end if
+
 
     !ZP idm and drf
     gpres=(grhor_t+grhog_t+grhog_drf_t)/3._dl
@@ -2293,6 +2326,7 @@
     !  Photon mass density over baryon mass density
     photbar=grhog_t/grhob_t
     pb43=4._dl/3*photbar
+
 
     ayprime(1)=adotoa*a
 
@@ -2442,22 +2476,41 @@
     ayprime(5)=vbdot
 
 
-    Gamma_t = CP%Gamma0/a2                          !ZP idm-drf Gamma_t = Gamma0/a^2
-    R_idm   = grhoc_idm_t/grhog_drf_t               !ZP rho_idm/rho_drf
 
     !ZP  idm equation of motion.
     clxc_idm_dot=-k*(z+vc_idm)
-    vc_idm_dot=-adotoa*vc_idm+a*Gamma_t*(3._dl/4*qg_drf-vc_idm)               
-
-    ayprime(6)=clxc_idm_dot
-    ayprime(7)=vc_idm_dot
 
     ! ZP drf equation of motion 
     clxg_drf_dot=-k*(4._dl/3._dl*z+qg_drf) 
-    qg_drf_dot = k/3._dl*clxg_drf + 0.75*R_idm*a*Gamma_t*(4._dl/3*vc_idm-qg_drf) 
 
-    ayprime(8) = clxg_drf_dot 
-    ayprime(9) = qg_drf_dot 
+
+    !ZP idm-drf
+    if (EV%TightCoupling_dark) then 
+       call thermo_dark(tau,opacity_dark,dopacity_dark)
+
+       pb43_dark= 4._dl/3*grhog_drf_t/grhoc_idm_t
+
+       !  ddota/a
+       adotdota=(adotoa*adotoa-gpres)/2
+       slip_dark = - (2*adotoa/(1+pb43_dark) + dopacity_dark/opacity_dark)* (vc_idm-3._dl/4*qg_drf) &
+        +(-adotdota*vc_idm-k/2*adotoa*clxg_drf -k*clxgdot/4)/(opacity_dark*(1+pb43_dark))
+
+       vc_idm_dot = (-adotoa*vc_idm+k/4._dl*pb43_dark*clxg_drf)/(1+pb43_dark)
+       vc_idm_dot = vc_idm_dot + pb43_dark/(1+pb43_dark)*slip_dark
+ 
+       qg_drf_dot = 4._dl/3*(-vc_idm_dot-adotoa*vc_idm)/pb43_dark+k/3._dl*clxg_drf
+    else 
+       Gamma_t = CP%Gamma0/a**CP%beta                  !ZP idm-drf Gamma_t = Gamma0/a**beta
+       R_idm   = grhoc_idm_t/grhog_drf_t               !ZP rho_idm/rho_drf
+
+       vc_idm_dot=-adotoa*vc_idm+a*Gamma_t*(3._dl/4*qg_drf-vc_idm)               
+       qg_drf_dot = k/3._dl*clxg_drf + 0.75*R_idm*a*Gamma_t*(4._dl/3*vc_idm-qg_drf) 
+    end if
+     
+    ayprime(6)=clxc_idm_dot
+    ayprime(7)=vc_idm_dot
+    ayprime(8)=clxg_drf_dot 
+    ayprime(9)=qg_drf_dot 
 
 
     if (.not. EV%no_phot_multpoles) then
