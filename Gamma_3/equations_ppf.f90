@@ -1814,7 +1814,7 @@
     tau_drf = min(tight_tau_drf, Thermo_OpacityToTime_drf(EV%k_buf/0.005))
     tau_idm = min(tight_tau_idm, Thermo_OpacityToTime_idm(EV%k_buf/0.005))
 
-    EV%TightSwitchoffTime_dark = max(tight_tau_drf, tight_tau_idm)
+    EV%TightSwitchoffTime_dark = max(tau_drf, tau_idm)
 
     if (second_order_tightcoupling) ep=ep*2
     EV%TightSwitchoffTime = min(tight_tau,Thermo_OpacityToTime(EV%k_buf/ep))

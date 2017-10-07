@@ -1814,7 +1814,7 @@
     tau_drf = min(tight_tau_drf, Thermo_OpacityToTime_drf(EV%k_buf/0.005))
     tau_idm = min(tight_tau_idm, Thermo_OpacityToTime_idm(EV%k_buf/0.005))
 
-    EV%TightSwitchoffTime_dark = max(tight_tau_drf, tight_tau_idm)
+    EV%TightSwitchoffTime_dark = max(tau_drf, tau_idm)
 
     if (second_order_tightcoupling) ep=ep*2
     EV%TightSwitchoffTime = min(tight_tau,Thermo_OpacityToTime(EV%k_buf/ep))
@@ -1935,7 +1935,7 @@
     !ZP idm density same to cdm
     !   
     y(6)=InitVec(i_clxc)
-    y(7)=0.
+    y(7)=(1._dl-exp(-tau/tight_tau_idm))*InitVec(i_vb)
 
     !ZP drf same to photon
     y(8)=InitVec(i_clxg)
