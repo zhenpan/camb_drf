@@ -1811,10 +1811,11 @@
     end if
 
     !ZP idm-drf  opacity_drf ~ 1/a, opacity_idm ~1/a**2, for beta=3, tight coupling turns off at late time
-    tau_drf = min(tight_tau_drf, Thermo_OpacityToTime_drf(EV%k_buf/0.005))
-    tau_idm = min(tight_tau_idm, Thermo_OpacityToTime_idm(EV%k_buf/0.005))
+    tau_drf = min(tight_tau_drf, Thermo_OpacityToTime_drf(EV%k_buf/0.02))
+    tau_idm = min(tight_tau_idm, Thermo_OpacityToTime_idm(EV%k_buf/0.02))
 
     EV%TightSwitchoffTime_dark = max(tau_drf, tau_idm)
+    write(*, '("TightSwitchoffTime_dark/Mpc    =", f8.1)') EV%TightSwitchoffTime_dark
 
     if (second_order_tightcoupling) ep=ep*2
     EV%TightSwitchoffTime = min(tight_tau,Thermo_OpacityToTime(EV%k_buf/ep))
@@ -2181,7 +2182,7 @@
 
     !ZP dm-drf variables
     real(dl) Gamma_t, R_idm, pb43_dark   
-    real(dl) opacity_dark, dopacity_dark
+    real(dl) opacity_drf, opacity_idm, dopacity_drf, dopacity_idm
     real(dl) slip_dark
 
     real(dl) dgq,grhob_t,grhor_t,grhoc_t,grhog_t,grhov_t,sigma,polter
@@ -2486,14 +2487,14 @@
 
     !ZP idm-drf
     if (EV%TightCoupling_dark) then 
-       call thermo_dark(tau,opacity_dark,dopacity_dark)
+       call thermo_dark(tau,opacity_drf, opacity_idm, dopacity_drf, dopacity_idm)
 
        pb43_dark= 4._dl/3*grhog_drf_t/grhoc_idm_t
 
        !  ddota/a
        adotdota=(adotoa*adotoa-gpres)/2
-       slip_dark = - (2*adotoa/(1+pb43_dark) + dopacity_dark/opacity_dark)* (vc_idm-3._dl/4*qg_drf) &
-        +(-adotdota*vc_idm-k/2*adotoa*clxg_drf -k*clxgdot/4)/(opacity_dark*(1+pb43_dark))
+       slip_dark = - (2*adotoa/(1+pb43_dark) + dopacity_drf/opacity_drf)* (vc_idm-3._dl/4*qg_drf) &
+        +(-adotdota*vc_idm-k/2*adotoa*clxg_drf -k*clxg_drf_dot/4)/(opacity_drf*(1+pb43_dark))
 
        vc_idm_dot = (-adotoa*vc_idm+k/4._dl*pb43_dark*clxg_drf)/(1+pb43_dark)
        vc_idm_dot = vc_idm_dot + pb43_dark/(1+pb43_dark)*slip_dark

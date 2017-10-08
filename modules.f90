@@ -2695,8 +2695,10 @@
     adot0=adotrad
     a0=adotrad*tauminn
     a02=a0*a0
+    write(*,'("adotrad",f9.6)') adotrad     !ZP       
 
     dotmu(1)= (a0*3._dl/4*grhoc_idm/grhog_drf)*a0*(CP%Gamma0/a0**CP%beta)
+    dotmu_idm(1)= a0*(CP%Gamma0/a0**CP%beta)  
 
     do i=2,nthermo_dark
        tau=tauminn*exp((i-1)*dlntau)
@@ -2715,10 +2717,10 @@
        ! tau_drf = 0.005 tau_Hub is the onset of tight coupling
 
        !Determine tight-coupling switch for drf
-       if (tight_tau_drf==0 .and. 1._dl/(tau*dotmu(i)) > 0.005) tight_tau_drf = tau
+       if (tight_tau_drf==0 .and. 1._dl/(tau*dotmu(i)) > 0.02) tight_tau_drf = tau
 
        !Determine tight-coupling switch for idm
-       if (tight_tau_idm==0 .and. 1._dl/(tau*dotmu_idm(i)) > 0.005) tight_tau_idm = tau
+       if (tight_tau_idm==0 .and. 1._dl/(tau*dotmu_idm(i)) > 0.02) tight_tau_idm = tau
 
        ! update varibles for next step
        a0=a

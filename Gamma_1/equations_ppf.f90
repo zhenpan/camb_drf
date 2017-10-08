@@ -2487,7 +2487,7 @@
        !  ddota/a
        adotdota=(adotoa*adotoa-gpres)/2
        slip_dark = - (2*adotoa/(1+pb43_dark) + dopacity_dark/opacity_dark)* (vc_idm-3._dl/4*qg_drf) &
-        +(-adotdota*vc_idm-k/2*adotoa*clxg_drf -k*clxgdot/4)/(opacity_dark*(1+pb43_dark))
+        +(-adotdota*vc_idm-k/2*adotoa*clxg_drf -k*clxg_drf_dot/4)/(opacity_dark*(1+pb43_dark))
 
        vc_idm_dot = (-adotoa*vc_idm+k/4._dl*pb43_dark*clxg_drf)/(1+pb43_dark)
        vc_idm_dot = vc_idm_dot + pb43_dark/(1+pb43_dark)*slip_dark
