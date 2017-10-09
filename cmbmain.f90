@@ -658,8 +658,8 @@
     ! elseif we want a smaller tau_start when idm is tight-couplged
     ! Combine a = adotrad*tau with  1/(a*Gamma_t * tau) = 0.005 or 1, we get tight_tau_idm, decouple_tau_idm
     
-    a1 = (0.005*CP%Gamma0/adotrad)**(1._dl/(CP%beta-2))  !For CP%beta == 3
-    a2 = (CP%Gamma0/adotrad)**(1._dl/(CP%beta-2))  
+    a1 = (0.005*CP%Gamma0/adotrad)**(1._dl/(CP%Gpwr-2))  !For CP%beta == 3
+    a2 = (CP%Gamma0/adotrad)**(1._dl/(CP%Gpwr-2))  
 
     if(taustart > a1/adotrad .and. taustart < a2/adotrad) then
        taustart = a1/adotrad

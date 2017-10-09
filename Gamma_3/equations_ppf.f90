@@ -2501,7 +2501,7 @@
  
        qg_drf_dot = 4._dl/3*(-vc_idm_dot-adotoa*vc_idm)/pb43_dark+k/3._dl*clxg_drf
     else 
-       Gamma_t = CP%Gamma0/a**CP%beta                  !ZP idm-drf Gamma_t = Gamma0/a**beta
+       Gamma_t = CP%Gamma0/a**CP%Gpwr                  !ZP idm-drf Gamma_t = Gamma0/a**beta
        R_idm   = grhoc_idm_t/grhog_drf_t               !ZP rho_idm/rho_drf
 
        vc_idm_dot=-adotoa*vc_idm+a*Gamma_t*(3._dl/4*qg_drf-vc_idm)               

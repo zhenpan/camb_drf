@@ -114,7 +114,7 @@
         real(dl)  :: omegac_idm     !ZP Omega of idm  (interacting dark matter)
 	real(dl)  :: Num_drf        !ZP num of drf (dark radiation fluid)
 	real(dl)  :: Gamma0         !ZP idm-drf coupling constant
-        integer   :: beta           !ZP idm-drf coupling scaling 
+        integer   :: Gpwr           !ZP idm-drf coupling scaling 
         logical   :: has_idmdrf_cpl !ZP    
         integer   :: Num_Nu_massive !sum of Nu_mass_numbers below
         integer   :: Nu_mass_eigenstates  !1 for degenerate masses
@@ -2634,7 +2634,7 @@
             +dddotmu(i+1)+2*(ddotmu(i)-ddotmu(i+1))))))/(tau*dlntau)
         end if
         if (present(dopacity_idm)) then
-            dopacity=(ddotmu_idm(i)+d*(dddotmu_idm(i)+d*(3*(ddotmu_idm(i+1)  &
+            dopacity_idm=(ddotmu_idm(i)+d*(dddotmu_idm(i)+d*(3*(ddotmu_idm(i+1)  &
             -ddotmu_idm(i))-2*dddotmu_idm(i)-dddotmu_idm(i+1)+d*(dddotmu_idm(i) &
             +dddotmu_idm(i+1)+2*(ddotmu_idm(i)-ddotmu_idm(i+1))))))/(tau*dlntau)
         end if
@@ -2696,7 +2696,8 @@
     a0=adotrad*tauminn
     a02=a0*a0
 
-    dotmu(1)= (a0*3._dl/4*grhoc_idm/grhog_drf)*a0*(CP%Gamma0/a0**CP%beta)
+    dotmu(1)= (a0*3._dl/4*grhoc_idm/grhog_drf)*a0*(CP%Gamma0/a0**CP%Gpwr)
+    dotmu_idm(1)= a0*(CP%Gamma0/a0**CP%Gpwr)  
 
     do i=2,nthermo_dark
        tau=tauminn*exp((i-1)*dlntau)
@@ -2708,8 +2709,8 @@
        adot=1/dtauda(a)
        a=a0+2._dl*dtau/(1._dl/adot0+1._dl/adot)
        
-       dotmu(i)= (a*3._dl/4*grhoc_idm/grhog_drf)*a*(CP%Gamma0/a**CP%beta)  
-       dotmu_idm(i)= a*(CP%Gamma0/a**CP%beta)  
+       dotmu(i)= (a*3._dl/4*grhoc_idm/grhog_drf)*a*(CP%Gamma0/a**CP%Gpwr)  
+       dotmu_idm(i)= a*(CP%Gamma0/a**CP%Gpwr)  
 
        ! For Gamma_t ~ T^\beta with \beta = 3, tau_drf is larger than tau at early time 
        ! tau_drf = 0.005 tau_Hub is the onset of tight coupling
@@ -2734,6 +2735,9 @@
      call splder(ddotmu,dddotmu,nthermo_dark,spline_data_dark)
      call splder(dddotmu,ddddotmu,nthermo_dark,spline_data_dark)
 
+     call splder(dotmu_idm,ddotmu_idm,nthermo_dark,spline_data_dark)
+     call splder(ddotmu_idm,dddotmu_idm,nthermo_dark,spline_data_dark)
+     call splder(dddotmu_idm,ddddotmu_idm,nthermo_dark,spline_data_dark)
      end subroutine inithermo_dark 
 
      end module ThermoData_dark
